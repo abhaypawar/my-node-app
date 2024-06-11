@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_CREDENTIALS_ID = 'aws-credentials-id'
+        S3_BUCKET = 'your-s3-bucket-name'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/your-repo/my-node-app.git'
+            }
+        }
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    def nodeHome = tool name: 'NodeJS', type: 'NodeJSInstallation'
+                    env.PATH = "${nodeHome}/bin:${env.PATH}"
+                }
+                sh 'npm install'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'npm test'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                withAWS(credentials: "${AWS_CREDENTIALS_ID}") {
+                    s3Upload bucket: "${S3_BUCKET}", includePathPattern: '**', workingDir: 'build'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
